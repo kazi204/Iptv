@@ -44,7 +44,7 @@ export default function App() {
           {/* Humble, polished footer */}
           <footer className="border-t border-white/5 bg-[#0d0d0f] py-6 text-center text-[10px] text-slate-500 select-none">
             <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 font-medium">
-              <p>© 2026 Vuecast Player Inc. All Rights Reserved.</p>
+              <p>© 2026 AhammadCast. All Rights Reserved.</p>
               <div className="flex gap-4">
                 <a href="#/" className="hover:text-slate-300">Privacy Policy</a>
                 <span className="text-white/10">•</span>

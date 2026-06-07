@@ -26,12 +26,21 @@ export const Navbar: React.FC = () => {
     filteredChannels,
     activeChannel,
     setActiveChannel,
-    isLoading
+    isLoading,
+    addCustomChannel
   } = useTVContext();
 
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState("");
+
+  // States for custom stream adding
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newStreamName, setNewStreamName] = useState("");
+  const [newStreamUrl, setNewStreamUrl] = useState("");
+  const [newStreamCategory, setNewStreamCategory] = useState("Custom Channels");
+  const [newStreamLogo, setNewStreamLogo] = useState("");
+  const [formError, setFormError] = useState("");
 
   const handlePlaylistChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setPlaylistUrl(e.target.value);
@@ -42,6 +51,35 @@ export const Navbar: React.FC = () => {
     setActiveChannel(channel);
     setIsSidebarOpen(false);
     navigate(`/watch/${channel.id}`);
+  };
+
+  const handleAddCustomStream = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStreamName.trim()) {
+      setFormError("Please enter a stream name.");
+      return;
+    }
+    if (!newStreamUrl.trim() || !/^https?:\/\//i.test(newStreamUrl)) {
+      setFormError("Please enter a valid HTTP/HTTPS stream link.");
+      return;
+    }
+
+    addCustomChannel(
+      newStreamName.trim(),
+      newStreamUrl.trim(),
+      newStreamCategory.trim() || "Custom Channels",
+      newStreamLogo.trim() || undefined
+    );
+
+    setNewStreamName("");
+    setNewStreamUrl("");
+    setNewStreamCategory("Custom Channels");
+    setNewStreamLogo("");
+    setFormError("");
+    setIsAddModalOpen(false);
+
+    setSelectedCategory("Custom Channels");
+    navigate("/");
   };
 
   return (
@@ -69,7 +107,7 @@ export const Navbar: React.FC = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold font-sans tracking-tight text-white flex items-center leading-none">
-                VUECAST<span className="text-teal-400 font-mono text-[9px] bg-teal-950/50 border border-teal-905/30 px-1 py-0.5 rounded ml-1 tracking-wider uppercase">Live</span>
+                AHAMMADCAST<span className="text-teal-400 font-mono text-[9px] bg-teal-950/50 border border-teal-950/30 px-1 py-0.5 rounded ml-1 tracking-wider uppercase">Live</span>
               </h1>
               <p className="text-[10px] text-slate-500">IPTV HLS Player</p>
             </div>
@@ -120,6 +158,16 @@ export const Navbar: React.FC = () => {
               ))}
             </select>
           </div>
+
+          {/* Add Custom Stream Link Button */}
+          <button
+            id="add-custom-stream-nav"
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-white/5 bg-teal-650/10 text-teal-450 hover:bg-teal-600/20 text-xs font-semibold transition-all cursor-pointer shadow-md shadow-teal-950/20"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Stream</span>
+          </button>
 
           {/* Favorites/Watchlist Toggle Button */}
           <button
@@ -194,7 +242,7 @@ export const Navbar: React.FC = () => {
               <div className="mb-4">
                 <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest mb-2 select-none">Group Filter</p>
                 <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-2">
-                  {["All", "Favorites", "Entertainment", "News", "Sports"].map((cat) => {
+                  {["All", "Favorites", "Custom Channels", "Entertainment", "News", "Sports"].map((cat) => {
                     const isTabActive = activeCategory === cat;
                     return (
                       <button
@@ -273,6 +321,144 @@ export const Navbar: React.FC = () => {
                   })
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modern, Animated Custom Channel addition Overlay Dialog */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#060608]/90 backdrop-blur-md"
+              onClick={() => {
+                setIsAddModalOpen(false);
+                setFormError("");
+              }}
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/5 bg-[#0e0e12] p-6 shadow-2xl z-10"
+            >
+              <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500/10 text-teal-400">
+                    <Radio className="h-4.5 w-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Add custom stream channel</h3>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Stream direct TV channels or live CCTV links</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setFormError("");
+                  }}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-white/5 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddCustomStream} className="space-y-4">
+                {formError && (
+                  <div className="rounded-xl border border-rose-500/10 bg-rose-500/5 p-3.5 text-xs text-rose-400 font-medium">
+                    {formError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Channel / Stream Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Bangladesh TV Live or My Custom Cam"
+                    value={newStreamName}
+                    onChange={(e) => {
+                      setNewStreamName(e.target.value);
+                      if (formError) setFormError("");
+                    }}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Stream HLS Link (URL) *
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    placeholder="https://example.com/stream/index.m3u8"
+                    value={newStreamUrl}
+                    onChange={(e) => {
+                      setNewStreamUrl(e.target.value);
+                      if (formError) setFormError("");
+                    }}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                      Group / Category
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. News, Custom Channels"
+                      value={newStreamCategory}
+                      onChange={(e) => setNewStreamCategory(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                      Logo Icon URL (Optional)
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/logo.png"
+                      value={newStreamLogo}
+                      onChange={(e) => setNewStreamLogo(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 border-t border-white/5 pt-4 mt-5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddModalOpen(false);
+                      setFormError("");
+                    }}
+                    className="rounded-xl border border-white/5 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:bg-[#1a1a20] transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-teal-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-teal-500 transition-all cursor-pointer shadow-lg shadow-teal-950/20"
+                  >
+                    Add Stream Channel
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

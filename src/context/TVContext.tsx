@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useMemo, ReactNode } from "react";
+import React, { createContext, useContext, useReducer, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { Channel, Playlist } from "../types";
 import { parseM3U } from "../utils/parseM3U";
 import { DEFAULT_M3U_PLAYLIST } from "../data/defaultChannels";
@@ -6,6 +6,7 @@ import { DEFAULT_M3U_PLAYLIST } from "../data/defaultChannels";
 // Define the precise state shape requested by the user, plus compatibility layers
 export interface TVState {
   channels: Channel[];
+  customChannels: Channel[];
   activeChannel: Channel | null;
   favorites: string[];
   activeCategory: string;
@@ -26,6 +27,8 @@ export type TVAction =
   | { type: "SET_CATEGORY"; payload: string }
   | { type: "SET_SEARCH"; payload: string }
   | { type: "SET_PLAYLIST_URL"; payload: string }
+  | { type: "ADD_CUSTOM_CHANNEL"; payload: Channel }
+  | { type: "DELETE_CUSTOM_CHANNEL"; payload: string }
   
   // Compatibility actions
   | { type: "SET_PLAYLISTS"; payload: Playlist[] }
@@ -56,8 +59,21 @@ const getStoredPlaylists = (): Playlist[] => {
   return [];
 };
 
+const getStoredCustomChannels = (): Channel[] => {
+  try {
+    const storedCustom = localStorage.getItem("tv_custom_channels");
+    if (storedCustom) {
+      return JSON.parse(storedCustom);
+    }
+  } catch (err) {
+    console.error("Failed to parse custom channels from storage", err);
+  }
+  return [];
+};
+
 const initialState: TVState = {
   channels: [],
+  customChannels: getStoredCustomChannels(),
   activeChannel: null,
   favorites: getStoredFavorites(),
   activeCategory: "All",
@@ -91,6 +107,32 @@ function tvReducer(state: TVState, action: TVAction): TVState {
       return { ...state, searchQuery: action.payload };
     case "SET_PLAYLIST_URL":
       return { ...state, playlistUrl: action.payload };
+    case "ADD_CUSTOM_CHANNEL": {
+      const updatedCustom = [...state.customChannels, action.payload];
+      localStorage.setItem("tv_custom_channels", JSON.stringify(updatedCustom));
+      return { ...state, customChannels: updatedCustom };
+    }
+    case "DELETE_CUSTOM_CHANNEL": {
+      const channelId = action.payload;
+      const updatedCustom = state.customChannels.filter((ch) => ch.id !== channelId);
+      localStorage.setItem("tv_custom_channels", JSON.stringify(updatedCustom));
+      
+      const updatedFavorites = state.favorites.filter((id) => id !== channelId);
+      localStorage.setItem("tv_favorites", JSON.stringify(updatedFavorites));
+      localStorage.setItem("tv_watchlist", JSON.stringify(updatedFavorites));
+
+      let nextActive = state.activeChannel;
+      if (state.activeChannel?.id === channelId) {
+        nextActive = state.channels[0] || updatedCustom[0] || null;
+      }
+
+      return {
+        ...state,
+        customChannels: updatedCustom,
+        favorites: updatedFavorites,
+        activeChannel: nextActive,
+      };
+    }
     case "SET_PLAYLISTS":
       return { ...state, playlists: action.payload };
     case "SET_LOADING":
@@ -108,6 +150,7 @@ interface TVContextProps {
   
   // Direct destructuring support matching the requested state properties
   channels: Channel[];
+  customChannels: Channel[];
   activeChannel: Channel | null;
   favorites: string[];
   activeCategory: string;
@@ -133,6 +176,10 @@ interface TVContextProps {
   importPlaylist: (name: string, contentOrUrl: string, isUrl: boolean) => Promise<boolean>;
   deletePlaylist: (playlistId: string) => void;
   reloadDefaultPlaylist: () => void;
+  
+  // Custom added streams
+  addCustomChannel: (name: string, url: string, category?: string, logoUrl?: string) => void;
+  deleteCustomChannel: (id: string) => void;
 }
 
 const TVContext = createContext<TVContextProps | undefined>(undefined);
@@ -218,21 +265,30 @@ export const TVProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const list = new Set<string>();
     list.add("All");
     list.add("Favorites");
+    list.add("Custom Channels");
     
     state.channels.forEach(ch => {
       if (ch.group) {
         list.add(ch.group);
       }
     });
+    state.customChannels.forEach(ch => {
+      if (ch.group) {
+        list.add(ch.group);
+      }
+    });
     return Array.from(list);
-  }, [state.channels]);
+  }, [state.channels, state.customChannels]);
 
   // Compute filtered channels based on active category (Favorites filter included) and search query
   const filteredChannels = useMemo(() => {
-    return state.channels.filter(ch => {
+    const allChannels = [...state.customChannels, ...state.channels];
+    return allChannels.filter(ch => {
       // Category filter
       if (state.activeCategory === "Favorites" || state.activeCategory === "★ Watchlist") {
         if (!state.favorites.includes(ch.id)) return false;
+      } else if (state.activeCategory === "Custom Channels") {
+        if (!ch.isCustom) return false;
       } else if (state.activeCategory !== "All") {
         if (ch.group !== state.activeCategory) return false;
       }
@@ -248,35 +304,35 @@ export const TVProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
 
       return true;
     });
-  }, [state.channels, state.activeCategory, state.favorites, state.searchQuery]);
+  }, [state.channels, state.customChannels, state.activeCategory, state.favorites, state.searchQuery]);
 
   // Define action dispatch wraps
-  const setActiveChannel = (ch: Channel | null) => {
+  const setActiveChannel = useCallback((ch: Channel | null) => {
     dispatch({ type: "SET_ACTIVE_CHANNEL", payload: ch });
-  };
+  }, []);
 
-  const setSelectedCategory = (cat: string) => {
+  const setSelectedCategory = useCallback((cat: string) => {
     dispatch({ type: "SET_CATEGORY", payload: cat });
-  };
+  }, []);
 
-  const setSearchQuery = (query: string) => {
+  const setSearchQuery = useCallback((query: string) => {
     dispatch({ type: "SET_SEARCH", payload: query });
-  };
+  }, []);
 
-  const toggleFavorite = (id: string) => {
+  const toggleFavorite = useCallback((id: string) => {
     dispatch({ type: "TOGGLE_FAVORITE", payload: id });
-  };
+  }, []);
 
-  const toggleWatchlist = (id: string) => {
+  const toggleWatchlist = useCallback((id: string) => {
     dispatch({ type: "TOGGLE_FAVORITE", payload: id });
-  };
+  }, []);
 
-  const setPlaylistUrl = (url: string) => {
+  const setPlaylistUrl = useCallback((url: string) => {
     dispatch({ type: "SET_PLAYLIST_URL", payload: url });
-  };
+  }, []);
 
   // Compatibility function for custom playlists
-  const importPlaylist = async (name: string, contentOrUrl: string, isUrl: boolean): Promise<boolean> => {
+  const importPlaylist = useCallback(async (name: string, contentOrUrl: string, isUrl: boolean): Promise<boolean> => {
     dispatch({ type: "SET_LOADING", payload: true });
     dispatch({ type: "SET_ERROR", payload: null });
     try {
@@ -328,9 +384,9 @@ export const TVProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     } finally {
       dispatch({ type: "SET_LOADING", payload: false });
     }
-  };
+  }, [state.playlists, state.channels, state.activeChannel]);
 
-  const deletePlaylist = (playlistId: string) => {
+  const deletePlaylist = useCallback((playlistId: string) => {
     const updated = state.playlists.filter(p => p.id !== playlistId);
     dispatch({ type: "SET_PLAYLISTS", payload: updated });
     localStorage.setItem("tv_playlists", JSON.stringify(updated));
@@ -341,13 +397,30 @@ export const TVProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     if (state.activeChannel && state.activeChannel.id.startsWith(playlistId)) {
       dispatch({ type: "SET_ACTIVE_CHANNEL", payload: filtered[0] || null });
     }
-  };
+  }, [state.playlists, state.channels, state.activeChannel]);
 
-  const reloadDefaultPlaylist = () => {
+  const reloadDefaultPlaylist = useCallback(() => {
     dispatch({ type: "SET_PLAYLIST_URL", payload: "https://iptv-org.github.io/iptv/countries/bd.m3u" });
     dispatch({ type: "SET_CATEGORY", payload: "All" });
     dispatch({ type: "SET_SEARCH", payload: "" });
-  };
+  }, []);
+
+  const addCustomChannel = useCallback((name: string, url: string, category: string = "Custom Channels", logoUrl: string = "") => {
+    const newChannel: Channel = {
+      id: `custom-${Date.now()}`,
+      name,
+      url,
+      logo: logoUrl || undefined,
+      group: category || "Custom Channels",
+      isCustom: true
+    };
+    dispatch({ type: "ADD_CUSTOM_CHANNEL", payload: newChannel });
+    dispatch({ type: "SET_ACTIVE_CHANNEL", payload: newChannel });
+  }, []);
+
+  const deleteCustomChannel = useCallback((id: string) => {
+    dispatch({ type: "DELETE_CUSTOM_CHANNEL", payload: id });
+  }, []);
 
   return (
     <TVContext.Provider
@@ -357,6 +430,7 @@ export const TVProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         
         // State unpacking
         channels: state.channels,
+        customChannels: state.customChannels,
         activeChannel: state.activeChannel,
         favorites: state.favorites,
         activeCategory: state.activeCategory,
@@ -382,6 +456,9 @@ export const TVProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         importPlaylist,
         deletePlaylist,
         reloadDefaultPlaylist,
+        
+        addCustomChannel,
+        deleteCustomChannel,
       }}
     >
       {children}

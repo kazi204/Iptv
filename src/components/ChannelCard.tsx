@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, memo } from "react";
 import { Channel } from "../types";
 import { useTV } from "../context/TVContext";
-import { Heart, Tv, Eye, Play } from "lucide-react";
+import { Heart, Tv, Eye, Play, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { checkStream } from "../utils/checkStream";
@@ -11,7 +11,7 @@ interface ChannelCardProps {
 }
 
 export const ChannelCard: React.FC<ChannelCardProps> = memo(({ channel }) => {
-  const { watchlist, toggleWatchlist, activeChannel, setActiveChannel } = useTV();
+  const { watchlist, toggleWatchlist, activeChannel, setActiveChannel, deleteCustomChannel } = useTV();
   const [imgError, setImgError] = useState(false);
   const [status, setStatus] = useState<"unchecked" | "alive" | "dead">("unchecked");
   const [latency, setLatency] = useState<number | null>(null);
@@ -166,6 +166,23 @@ export const ChannelCard: React.FC<ChannelCardProps> = memo(({ channel }) => {
         >
           <Heart className={`h-4.5 w-4.5 ${isFavorited ? "fill-current text-rose-500" : ""}`} />
         </button>
+
+        {/* Custom Channel Trash Delete Overlay */}
+        {channel.isCustom && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (window.confirm(`Are you sure you want to delete "${channel.name}"?`)) {
+                deleteCustomChannel(channel.id);
+              }
+            }}
+            className="absolute left-2 top-2 p-1.5 rounded-lg border border-rose-500/10 text-rose-450 bg-rose-500/10 hover:bg-rose-500/25 transition-all cursor-pointer z-10"
+            title="Delete custom channel"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
 
         {/* Quick watch arrow indicator on hover */}
         <div className="absolute bottom-3 right-3 opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-teal-400 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider">

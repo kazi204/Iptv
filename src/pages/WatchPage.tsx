@@ -10,23 +10,28 @@ import { motion } from "motion/react";
 export const WatchPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { channels, activeChannel, setActiveChannel, watchlist, toggleWatchlist } = useTV();
+  const { channels, customChannels, activeChannel, setActiveChannel, watchlist, toggleWatchlist } = useTV();
   const [streamActive, setStreamActive] = useState<boolean | null>(null);
   const [checkingUrl, setCheckingUrl] = useState(false);
   const [shareFeedback, setShareFeedback] = useState(false);
 
-  // Sync active channel to url parameter on mount/update
+  // Combine TV channels and custom imported streams for cohesive addressability
+  const allChannels = useMemo(() => {
+    return [...(customChannels || []), ...channels];
+  }, [channels, customChannels]);
+
+  // Sync active channel to url parameter on mount/update using reference-safe checks
   useEffect(() => {
-    if (id && channels.length > 0) {
-      const match = channels.find(ch => ch.id === id);
-      if (match) {
+    if (id && allChannels.length > 0) {
+      const match = allChannels.find(ch => ch.id === id);
+      if (match && activeChannel?.id !== id) {
         setActiveChannel(match);
-      } else {
-        // If not found, fallback to home or first channel
+      } else if (!match) {
+        // Fallback or warning if channel ID is not resolved in memory
         console.warn(`Channel id ${id} not found.`);
       }
     }
-  }, [id, channels, setActiveChannel]);
+  }, [id, allChannels.length, activeChannel?.id, setActiveChannel]);
 
   // Run async connection reachability tests on stream sources
   const activeUrl = activeChannel?.url;
@@ -55,17 +60,17 @@ export const WatchPage: React.FC = () => {
   // Extract other channels in the same group (recommendations)
   const recommendations = useMemo(() => {
     if (!activeChannel) return [];
-    return channels
+    return allChannels
       .filter(ch => ch.group === activeChannel.group && ch.id !== activeChannel.id)
       .slice(0, 5);
-  }, [channels, activeChannel]);
+  }, [allChannels, activeChannel]);
 
   // General fallback list if no recommendations in group
   const randomRecommendations = useMemo(() => {
-    return channels
+    return allChannels
       .filter(ch => ch.id !== activeChannel?.id)
       .slice(0, 6);
-  }, [channels, activeChannel]);
+  }, [allChannels, activeChannel]);
 
   const sidebarChannels = recommendations.length > 0 ? recommendations : randomRecommendations;
   const isFavorited = activeChannel ? watchlist.includes(activeChannel.id) : false;
@@ -76,7 +81,7 @@ export const WatchPage: React.FC = () => {
     setTimeout(() => setShareFeedback(false), 2000);
   };
 
-  if (!activeChannel && channels.length === 0) {
+  if (!activeChannel && allChannels.length === 0) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#0a0a0b] pb-20">
         <div className="text-center">
@@ -88,7 +93,7 @@ export const WatchPage: React.FC = () => {
   }
 
   // Fallback in case ID is wrong and we have channel lists
-  if (!activeChannel && channels.length > 0) {
+  if (!activeChannel && allChannels.length > 0) {
     return (
       <div className="max-w-md mx-auto text-center py-20 px-4">
         <h4 className="text-sm font-bold text-slate-100">Broadcast Channel Not Found</h4>

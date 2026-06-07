@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { useTV } from "../context/TVContext";
-import { Star, Flame, Trophy, Newspaper, Music, Theater, Compass, HeartPulse, Heart } from "lucide-react";
+import { Star, Flame, Trophy, Newspaper, Music, Theater, Compass, HeartPulse, Heart, Radio } from "lucide-react";
 import { motion } from "motion/react";
 
 // Helper to provide nice icons for popular categories
@@ -9,6 +9,7 @@ const getCategoryIcon = (category: string) => {
   if (normalized === "all") return <Compass className="h-3.5 w-3.5" />;
   if (normalized === "favorites") return <Heart className="h-3.5 w-3.5 text-rose-500 fill-current" />;
   if (normalized.includes("watchlist")) return <Star className="h-3.5 w-3.5 text-amber-400" />;
+  if (normalized.includes("custom")) return <Radio className="h-3.5 w-3.5 text-teal-400" />;
   if (normalized.includes("news")) return <Newspaper className="h-3.5 w-3.5" />;
   if (normalized.includes("sport")) return <Trophy className="h-3.5 w-3.5 text-orange-400" />;
   if (normalized.includes("science") || normalized.includes("space")) return <Flame className="h-3.5 w-3.5 text-cyan-400" />;

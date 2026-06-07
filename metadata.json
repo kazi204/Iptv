@@ -1,6 +1,6 @@
 {
-  "name": "Live TV Streamer",
-  "description": "A modern React live TV streaming application featuring M3U playlist parsing, custom player control using hls.js, categorizing, search, and personal watchlists.",
+  "name": "AhammadCast",
+  "description": "A premium React live TV streaming application featuring M3U playlist parsing, custom player control using hls.js, categorizing, search, personal watchlists, and stream link adding.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
